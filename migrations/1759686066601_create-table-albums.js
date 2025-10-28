@@ -1,12 +1,3 @@
-/**
- * @type {import('node-pg-migrate').ColumnDefinitions | undefined}
- */
-
-/**
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @param run {() => void | undefined}
- * @returns {Promise<void> | void}
- */
 exports.up = (pgm) => {
   pgm.createTable('albums', {
     id: {
@@ -14,7 +5,7 @@ exports.up = (pgm) => {
       primaryKey: true,
     },
     name: {
-      type: 'TEXT',
+      type: 'VARCHAR(255)',
       notNull: true,
     },
     year: {
@@ -23,12 +14,6 @@ exports.up = (pgm) => {
     },
   });
 };
-
-/**
- * @param pgm {import('node-pg-migrate').MigrationBuilder}
- * @param run {() => void | undefined}
- * @returns {Promise<void> | void}
- */
 
 exports.down = (pgm) => {
   pgm.dropTable('albums');

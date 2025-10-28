@@ -2,7 +2,10 @@ require('dotenv').config();
 
 const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
+const Inert = require('@hapi/inert');
+const path = require('path');
 
+const config = require('./utils/config');
 const ClientError = require('./exceptions/ClientError');
 
 const albums = require('./api/albums');
@@ -34,21 +37,41 @@ const PlaylistsValidator = require('./validator/playlists');
 
 const ActivitiesService = require('./services/postgres/ActivitiesService');
 
+// Exports
+const _exports = require('./api/exports');
+const ProducerService = require('./services/rabbitmq/ProducerService');
+const ExportsValidator = require('./validator/exports');
+
+// uploads
+const uploads = require('./api/uploads');
+const StorageService = require('./services/storage/StorageService');
+const UploadsValidator = require('./validator/uploads');
+
+// likes
+const likes = require('./api/likes');
+const AlbumLikesService = require('./services/postgres/AlbumLikesService');
+
+// cache
+const CacheService = require('./services/redis/CacheService');
+
 const init = async () => {
+  const cacheService = new CacheService();
+  const uploadsPath = path.resolve(__dirname, 'api', 'albums', 'covers');
+  const storageService = new StorageService(uploadsPath + path.sep);
+  const albumLikesService = new AlbumLikesService(cacheService);
+  const producerService = ProducerService;
+
   const usersService = new UsersService();
   const authenticationsService = new AuthenticationsService();
-
   const collaborationsService = new CollaborationsService();
   const activitiesService = new ActivitiesService();
-
   const playlistsService = new PlaylistsService(collaborationsService, activitiesService);
-
   const songsService = new SongsService();
   const albumsService = new AlbumsService();
 
   const server = Hapi.server({
-    port: process.env.PORT,
-    host: process.env.HOST,
+    port: config.app.port || 5000,
+    host: config.app.host || 'localhost',
     routes: {
       cors: {
         origin: ['*'],
@@ -60,10 +83,13 @@ const init = async () => {
     {
       plugin: Jwt,
     },
+    {
+      plugin: Inert,
+    },
   ]);
 
   server.auth.strategy('openmusic_jwt', 'jwt', {
-    keys: process.env.ACCESS_TOKEN_KEY,
+    keys: config.jwt.accessTokenKey,
     verify: {
       aud: false,
       iss: false,
@@ -125,6 +151,29 @@ const init = async () => {
         playlistsService,
         usersService,
         validator: CollaborationsValidator,
+      },
+    },
+    {
+      plugin: _exports,
+      options: {
+        producerService,
+        playlistsService,
+        validator: ExportsValidator,
+      },
+    },
+    {
+      plugin: uploads,
+      options: {
+        storageService,
+        albumsService,
+        validator: UploadsValidator,
+      },
+    },
+    {
+      plugin: likes,
+      options: {
+        albumLikesService,
+        albumsService,
       },
     },
   ]);
